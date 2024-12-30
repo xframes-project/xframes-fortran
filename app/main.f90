@@ -61,19 +61,78 @@ module c_interface
     end interface
 end module c_interface
 
+module font_definitions
+    implicit none
+
+    type :: FontDef
+        character(len=:), allocatable :: name
+        integer :: size
+    end type FontDef
+
+end module font_definitions
+
 program main
     use c_interface
     use iso_c_binding
+    use json_module
+    use font_definitions
+    use, intrinsic :: iso_fortran_env, only: wp => real64
     implicit none
 
     type(c_funptr) :: onInitPtr, onTextChangedPtr
+
+    type(json_core) :: json
+    type(json_value), pointer :: p, inp, defs
+
+    integer :: i
+
+    type(FontDef), dimension(:), allocatable :: fontDefs
+
+    character(len=:), allocatable :: fontDefsJson
+
+    allocate(fontDefs(8))
+
+    fontDefs(1) = FontDef("roboto-regular", 16)
+    fontDefs(2) = FontDef("roboto-regular", 18)
+    fontDefs(3) = FontDef("roboto-regular", 20)
+    fontDefs(4) = FontDef("roboto-regular", 24)
+    fontDefs(5) = FontDef("roboto-regular", 28)
+    fontDefs(6) = FontDef("roboto-regular", 32)
+    fontDefs(7) = FontDef("roboto-regular", 36)
+    fontDefs(8) = FontDef("roboto-regular", 48)
+
+    call json%initialize()
+
+    call json%create_object(p, '')
+
+    call json%create_object(defs, 'defs')
+
+    do i = 1, size(fontDefs)
+        call json%create_object(inp, 'fontDef')
+        call json%add(inp, 'name', fontDefs(i)%name)
+        call json%add(inp, 'size', fontDefs(i)%size)
+        call json%add(defs, inp)
+        nullify(inp)
+    end do
+
+    call json%add(p, defs)
+
+    call json%serialize(p, fontDefsJson)
+
+    print *, "JSON String: ", fontDefsJson
+
+    ! Clean up
+    call json%destroy(p)
+    if (json%failed()) stop 1
+
+    
 
     ! Assign callback function pointers
     onInitPtr = c_funloc(myInit)
     onTextChangedPtr = c_funloc(myTextChanged)
 
     ! Call the init function
-    call init("assets/", "font_defs", "style_overrides", onInitPtr, onTextChangedPtr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr)
+    call init("assets/", fontDefsJson, "style_overrides", onInitPtr, onTextChangedPtr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr)
 
     print *, "Press Enter to exit the program..."
     read(*, *)
