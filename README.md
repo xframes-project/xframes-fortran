@@ -31,3 +31,10 @@ Finally, build the app via fpm
 Run the app via fpm
 
 `fpm run --link-flag "-L./"`
+
+## Screenshots
+
+Windows 11
+
+![image](https://github.com/user-attachments/assets/cd3aab3b-8201-4f50-b4c9-94165d44e5e7)
+
