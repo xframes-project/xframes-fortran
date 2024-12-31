@@ -100,7 +100,6 @@ contains
 
     subroutine init_theme(theme)
         type(ImGuiTheme), intent(out) :: theme
-        integer :: i
 
         ! Initialize the entries with the COUNT of ImGuiCol
         allocate(theme%entries(0:COUNT-1))
@@ -168,6 +167,7 @@ contains
         type(json_value), pointer :: obj, color_tuple
         integer :: i
 
+        call json%initialize(compact_reals=.true.,real_format='*')
         call json%create_object(obj, '')
 
         do i = 0, size(theme%entries) - 1
@@ -193,65 +193,34 @@ end module imgui_theme
 
 
 module c_interface
-    use iso_c_binding
+    use, intrinsic :: iso_c_binding
     implicit none
 
     interface
-        subroutine OnInitCb() bind(C)
-        end subroutine OnInitCb
-
-        subroutine OnTextChangedCb(index, text) bind(C)
-            import :: c_int, c_char
-            integer(c_int), value :: index
-            character(c_char), dimension(*), intent(in) :: text
-        end subroutine OnTextChangedCb
-
-        subroutine OnComboChangedCb(index, comboIndex) bind(C)
-            import :: c_int
-            integer(c_int), value :: index
-            integer(c_int), value :: comboIndex
-        end subroutine OnComboChangedCb
-
-        subroutine OnNumericValueChangedCb(index, value) bind(C)
-            import :: c_int, c_float
-            integer(c_int), value :: index
-            real(c_float), value :: value
-        end subroutine OnNumericValueChangedCb
-
-        subroutine OnBooleanValueChangedCb(index, value) bind(C)
-            import :: c_int, c_bool
-            integer(c_int), value :: index
-            logical(c_bool), value :: value
-        end subroutine OnBooleanValueChangedCb
-
-        subroutine OnMultipleNumericValuesChangedCb(index, values, numValues) bind(C)
-            import :: c_int, c_float
-            integer(c_int), value :: index
-            real(c_float), dimension(*), intent(in) :: values
-            integer(c_int), value :: numValues
-        end subroutine OnMultipleNumericValuesChangedCb
-
-        subroutine OnClickCb(index) bind(C)
-            import :: c_int
-            integer(c_int), value :: index
-        end subroutine OnClickCb
-    end interface
-
-    ! Declare the 'init' function
-    interface
-        subroutine init(assetsBasePath, rawFontDefinitions, rawStyleOverrideDefinitions, onInit, onTextChanged, onComboChanged, onNumericValueChanged, onBooleanValueChanged, onMultipleNumericValuesChanged, onClick) bind(C)
-            import :: c_char, c_funptr
-            character(c_char), dimension(*), intent(in) :: assetsBasePath
-            character(c_char), dimension(*), intent(in) :: rawFontDefinitions
-            character(c_char), dimension(*), intent(in) :: rawStyleOverrideDefinitions
-            type(c_funptr), value :: onInit
-            type(c_funptr), value :: onTextChanged
-            type(c_funptr), value :: onComboChanged
-            type(c_funptr), value :: onNumericValueChanged
-            type(c_funptr), value :: onBooleanValueChanged
-            type(c_funptr), value :: onMultipleNumericValuesChanged
-            type(c_funptr), value :: onClick
+        subroutine init(assetsBasePath, rawFontDefinitions, rawStyleOverrideDefinitions, onInit, onTextChanged, onComboChanged, onNumericValueChanged, onBooleanValueChanged, onMultipleNumericValuesChanged, onClick) bind(C, name="init")
+            import :: c_char, c_funptr, c_ptr
+            type (c_ptr), value :: assetsBasePath  
+            type (c_ptr), value :: rawFontDefinitions
+            type (c_ptr), value :: rawStyleOverrideDefinitions
+            type(c_funptr), intent(in), value :: onInit
+            type(c_funptr), intent(in), value :: onTextChanged
+            type(c_funptr), intent(in), value :: onComboChanged
+            type(c_funptr), intent(in), value :: onNumericValueChanged
+            type(c_funptr), intent(in), value :: onBooleanValueChanged
+            type(c_funptr), intent(in), value :: onMultipleNumericValuesChanged
+            type(c_funptr), intent(in), value :: onClick
         end subroutine init
+        
+        ! subroutine setElement(elementJson) bind(C, name="setElement")
+        !     import :: c_char
+        !     character(c_char), dimension(*), intent(in) :: elementJson
+        ! end subroutine setElement
+        
+        ! subroutine setChildren(id, childrenJson) bind(C, name="setChildren")
+        !     use iso_c_binding, only: c_int, c_char
+        !     integer(c_int), intent(in) :: id
+        !     character(c_char), dimension(*), intent(in) :: childrenJson
+        ! end subroutine setChildren
     end interface
 end module c_interface
 
@@ -265,31 +234,69 @@ module font_definitions
 
 end module font_definitions
 
+! module xframes
+!     use c_interface
+!     use iso_c_binding
+!     use json_module
+!     implicit none
+
+    ! character(len=:), allocatable :: nodeJson
+
+    ! type(json_core) :: xframesJson
+
+! contains
+    ! subroutine make_node()
+        ! type(json_value), pointer :: p, inp, defs
+
+        ! call xframesJson%create_object(p, '')
+        ! call xframesJson%add(p, 'id', 0)
+
+        ! call xframesJson%serialize(p, nodeJson)
+
+        ! call xframesJson%destroy(p)
+        
+        ! call setElement("{'id': 0}")
+        ! call setElement('{"id":1,"type":"unformatted-text","text":"Hello, world"}')
+    ! end subroutine make_node
+! end module xframes
+
 program main
     use c_interface
     use iso_c_binding
     use json_module
     use font_definitions
     use imgui_theme
+    ! use xframes
     use, intrinsic :: iso_fortran_env, only: wp => real64
     implicit none
 
-    type(c_funptr) :: onInitPtr, onTextChangedPtr, noopPtr
+    type(c_funptr) :: onInitPtr, onTextChangedPtr, onComboChangedPtr
+    type(c_funptr) :: onNumericValueChangedPtr, onBooleanValueChangedPtr, onMultipleNumericValuesChangedPtr, onClickPtr
 
     type(json_core) :: json
     type(json_value), pointer :: p, inp, defs
 
     type(ImGuiTheme) :: theme
 
+    character(len=40,kind=c_char), allocatable, target :: assetsBasePath
+    type(c_ptr), allocatable :: assetsBasePath_ptr
+
     integer :: i
 
     type(FontDef), dimension(:), allocatable :: fontDefs
 
-    character(len=:), allocatable :: fontDefsJson
-    character(len=:), allocatable :: themeJson
+    character(len=:,kind=c_char), allocatable, target :: fontDefsJson
+    character(len=:,kind=c_char), allocatable, target :: themeJson
+
+    type(c_ptr), allocatable :: fontDefsJson_ptr
+    type(c_ptr), allocatable :: themeJson_ptr
 
     allocate(fontDefs(8))
 
+    allocate(assetsBasePath)
+    assetsBasePath = "./assets"//C_NULL_CHAR
+    assetsBasePath_ptr = c_loc(assetsBasePath)
+    
     fontDefs(1) = FontDef("roboto-regular", 16)
     fontDefs(2) = FontDef("roboto-regular", 18)
     fontDefs(3) = FontDef("roboto-regular", 20)
@@ -318,53 +325,82 @@ program main
 
     call json%serialize(p, fontDefsJson)
 
-    print *, fontDefsJson
-
-    ! Clean up
-    call json%destroy(p)
-    if (json%failed()) stop 1
-
     call init_theme(theme)
     call serialize_theme_to_json(theme, themeJson)
 
-    print *, themeJson
-
-    ! Assign callback function pointers
     onInitPtr = c_funloc(myInit)
     onTextChangedPtr = c_funloc(myTextChanged)
-    noopPtr = c_funloc(noop)
+    onComboChangedPtr = c_funloc(myComboChanged)
+    onNumericValueChangedPtr = c_funloc(myNumericValueChanged)
+    onBooleanValueChangedPtr = c_funloc(myBooleanValueChanged)
+    onMultipleNumericValuesChangedPtr = c_funloc(myMultipleNumericValuesChanged)
+    onClickPtr = c_funloc(myClick)
 
-    ! Call the init function
-    call init("./assets", fontDefsJson, themeJson, onInitPtr, onTextChangedPtr, onInitPtr, onInitPtr, onInitPtr, onInitPtr, onInitPtr)
+    fontDefsJson = fontDefsJson // C_NULL_CHAR
+    themeJson = themeJson // C_NULL_CHAR
+
+    fontDefsJson_ptr = c_loc(fontDefsJson)
+    themeJson_ptr = c_loc(themeJson)
+
+    call init(assetsBasePath_ptr, fontDefsJson_ptr, themeJson_ptr, onInitPtr, onTextChangedPtr, onComboChangedPtr, onNumericValueChangedPtr, onBooleanValueChangedPtr, onMultipleNumericValuesChangedPtr, onClickPtr)
+
+    call json%destroy(p)
+    if (json%failed()) stop 1
 
     print *, "Press Enter to exit the program..."
     read(*, *)
 contains
-
     subroutine myInit() bind(C)
         print *, "Initialization callback invoked."
     end subroutine myInit
-
-    subroutine noop() bind(C)
-        print *, "No-op."
-    end subroutine noop
 
     subroutine myTextChanged(index, text) bind(C)
         use iso_c_binding, only: c_int, c_char
         integer(c_int), value :: index
         character(c_char), dimension(*), intent(in) :: text
-        integer :: i
 
-        ! Workaround to process the assumed-size character array
-        print *, "Text changed in widget", index
-        print *, "New text:"
-        i = 1
-        do while (text(i) /= c_null_char)
-            write(*, '(A)', advance="no") text(i:i)
-            i = i + 1
-        end do
-        print *  ! Finalize the line
+        print *, "Text changed callback. Index:", index
     end subroutine myTextChanged
+
+    subroutine myComboChanged(index, value) bind(C)
+        use iso_c_binding, only: c_int
+        integer(c_int), value :: index
+        integer(c_int), value :: value
+
+        print *, "Combo changed callback. Index:", index, "Value:", value
+    end subroutine myComboChanged
+
+    subroutine myNumericValueChanged(index, value) bind(C)
+        use iso_c_binding, only: c_int, c_float
+        integer(c_int), value :: index
+        real(c_float), value :: value
+
+        print *, "Numeric value changed callback. Index:", index, "Value:", value
+    end subroutine myNumericValueChanged
+
+    subroutine myBooleanValueChanged(index, value) bind(C)
+        use iso_c_binding, only: c_int, c_bool
+        integer(c_int), value :: index
+        logical(c_bool), value :: value
+
+        print *, "Boolean value changed callback. Index:", index, "Value:", value
+    end subroutine myBooleanValueChanged
+
+    subroutine myMultipleNumericValuesChanged(index, values, numValues) bind(C)
+        use iso_c_binding, only: c_int, c_float
+        integer(c_int), value :: index
+        real(c_float), dimension(*), intent(in) :: values
+        integer(c_int), value :: numValues
+
+        print *, "Multiple numeric values changed callback. Index:", index, "Num values:", numValues
+    end subroutine myMultipleNumericValuesChanged
+
+    subroutine myClick(index) bind(C)
+        use iso_c_binding, only: c_int
+        integer(c_int), value :: index
+
+        print *, "Click callback. Index:", index
+    end subroutine myClick
 
 end program main
 
