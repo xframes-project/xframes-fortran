@@ -347,6 +347,10 @@ program main
     call json%destroy(p)
     if (json%failed()) stop 1
 
+    deallocate(assetsBasePath_ptr)
+    deallocate(fontDefsJson_ptr)
+    deallocate(themeJson_ptr)
+
     print *, "Press Enter to exit the program..."
     read(*, *)
 contains
