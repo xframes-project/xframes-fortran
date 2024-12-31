@@ -168,13 +168,12 @@ contains
         type(json_value), pointer :: obj, color_tuple
         integer :: i
 
-        call json%initialize()
         call json%create_object(obj, '')
 
         do i = 0, size(theme%entries) - 1
             call json%create_array(color_tuple, to_string(theme%entries(i)%key))
             call json%add(color_tuple, '', theme%entries(i)%value%hex_code)
-            call json%add(color_tuple, '', int(theme%entries(i)%value%alpha))
+            call json%add(color_tuple, '', theme%entries(i)%value%alpha)
             call json%add(obj, color_tuple)
  
             nullify(color_tuple)
@@ -275,7 +274,7 @@ program main
     use, intrinsic :: iso_fortran_env, only: wp => real64
     implicit none
 
-    type(c_funptr) :: onInitPtr, onTextChangedPtr
+    type(c_funptr) :: onInitPtr, onTextChangedPtr, noopPtr
 
     type(json_core) :: json
     type(json_value), pointer :: p, inp, defs
@@ -300,7 +299,8 @@ program main
     fontDefs(7) = FontDef("roboto-regular", 36)
     fontDefs(8) = FontDef("roboto-regular", 48)
 
-    call json%initialize()
+    ! Both compact_reals and real_format parameters are crucial as otherwise `1.0` becomes `0.1E+1` when serialized
+    call json%initialize(compact_reals=.true.,real_format='*')
 
     call json%create_object(p, '')
 
@@ -332,9 +332,10 @@ program main
     ! Assign callback function pointers
     onInitPtr = c_funloc(myInit)
     onTextChangedPtr = c_funloc(myTextChanged)
+    noopPtr = c_funloc(noop)
 
     ! Call the init function
-    call init("./assets", fontDefsJson, themeJson, onInitPtr, onTextChangedPtr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr, c_null_funptr)
+    call init("./assets", fontDefsJson, themeJson, onInitPtr, onTextChangedPtr, onInitPtr, onInitPtr, onInitPtr, onInitPtr, onInitPtr)
 
     print *, "Press Enter to exit the program..."
     read(*, *)
@@ -343,6 +344,10 @@ contains
     subroutine myInit() bind(C)
         print *, "Initialization callback invoked."
     end subroutine myInit
+
+    subroutine noop() bind(C)
+        print *, "No-op."
+    end subroutine noop
 
     subroutine myTextChanged(index, text) bind(C)
         use iso_c_binding, only: c_int, c_char
