@@ -211,16 +211,16 @@ module c_interface
             type(c_funptr), intent(in), value :: onClick
         end subroutine init
         
-        ! subroutine setElement(elementJson) bind(C, name="setElement")
-        !     import :: c_char
-        !     character(c_char), dimension(*), intent(in) :: elementJson
-        ! end subroutine setElement
+        subroutine setElement(elementJson) bind(C, name="setElement")
+            import :: c_ptr
+            type (c_ptr), value :: elementJson  
+        end subroutine setElement
         
-        ! subroutine setChildren(id, childrenJson) bind(C, name="setChildren")
-        !     use iso_c_binding, only: c_int, c_char
-        !     integer(c_int), intent(in) :: id
-        !     character(c_char), dimension(*), intent(in) :: childrenJson
-        ! end subroutine setChildren
+        subroutine setChildren(id, childrenJson) bind(C, name="setChildren")
+            use iso_c_binding, only: c_int, c_ptr
+            integer(c_int), value :: id
+            type (c_ptr), value :: childrenJson
+        end subroutine setChildren
     end interface
 end module c_interface
 
@@ -234,31 +234,90 @@ module font_definitions
 
 end module font_definitions
 
-! module xframes
-!     use c_interface
-!     use iso_c_binding
-!     use json_module
-!     implicit none
+module xframes
+    use c_interface
+    use iso_c_binding
+    use json_module
+    implicit none
 
-    ! character(len=:), allocatable :: nodeJson
+    character(len=:), allocatable :: nodeJson
 
-    ! type(json_core) :: xframesJson
+    
 
-! contains
-    ! subroutine make_node()
-        ! type(json_value), pointer :: p, inp, defs
+contains
+    subroutine make_node()
+        character(len=:,kind=c_char), allocatable, target :: nodeJson
+        type(c_ptr), allocatable :: nodeJson_ptr
+        type(json_core) :: xframesJson
+        type(json_value), pointer :: p, inp, defs
 
-        ! call xframesJson%create_object(p, '')
-        ! call xframesJson%add(p, 'id', 0)
+        call xframesJson%initialize(compact_reals=.true.,real_format='*')
 
-        ! call xframesJson%serialize(p, nodeJson)
+        call xframesJson%create_object(p, '')
+        call xframesJson%add(p, 'id', 0)
+        call xframesJson%add(p, 'type', 'node')
+        call xframesJson%add(p, 'root', .true.)
 
-        ! call xframesJson%destroy(p)
+        call xframesJson%serialize(p, nodeJson)
+
+        call xframesJson%destroy(p)
+
+        nodeJson = nodeJson // C_NULL_CHAR
+        nodeJson_ptr = c_loc(nodeJson)
         
-        ! call setElement("{'id': 0}")
-        ! call setElement('{"id":1,"type":"unformatted-text","text":"Hello, world"}')
-    ! end subroutine make_node
-! end module xframes
+        call setElement(nodeJson_ptr)
+
+        deallocate(nodeJson_ptr)
+    end subroutine make_node
+
+    subroutine make_unformatted_text()
+        character(len=:,kind=c_char), allocatable, target :: unformattedTextJson
+        type(c_ptr), allocatable :: unformattedTextJson_ptr
+        type(json_core) :: xframesJson
+        type(json_value), pointer :: p, inp, defs
+
+        call xframesJson%initialize(compact_reals=.true.,real_format='*')
+
+        call xframesJson%create_object(p, '')
+        call xframesJson%add(p, 'id', 1)
+        call xframesJson%add(p, 'type', 'unformatted-text')
+        call xframesJson%add(p, 'text', 'Hello, world')
+
+        call xframesJson%serialize(p, unformattedTextJson)
+
+        call xframesJson%destroy(p)
+
+        unformattedTextJson = unformattedTextJson // C_NULL_CHAR
+        unformattedTextJson_ptr = c_loc(unformattedTextJson)
+        
+        call setElement(unformattedTextJson_ptr)
+
+        deallocate(unformattedTextJson_ptr)
+    end subroutine make_unformatted_text
+
+    subroutine set_children()
+        character(len=:,kind=c_char), allocatable, target :: childrenJson
+        type(c_ptr), allocatable :: childrenJson_ptr
+        type(json_core) :: xframesJson
+        type(json_value), pointer :: p, inp, defs
+
+        call xframesJson%initialize(compact_reals=.true.,real_format='*')
+
+        call xframesJson%create_array(p, 'array')
+        call xframesJson%add(p, '', 1)
+
+        call xframesJson%serialize(p, childrenJson)
+
+        call xframesJson%destroy(p)
+
+        childrenJson = childrenJson // C_NULL_CHAR
+        childrenJson_ptr = c_loc(childrenJson)
+        
+        call setChildren(0, childrenJson_ptr)
+
+        deallocate(childrenJson_ptr)
+    end subroutine set_children
+end module xframes
 
 program main
     use c_interface
@@ -266,7 +325,7 @@ program main
     use json_module
     use font_definitions
     use imgui_theme
-    ! use xframes
+    use xframes
     use, intrinsic :: iso_fortran_env, only: wp => real64
     implicit none
 
@@ -356,6 +415,10 @@ program main
 contains
     subroutine myInit() bind(C)
         print *, "Initialization callback invoked."
+
+        call make_node()
+        call make_unformatted_text()
+        call set_children()
     end subroutine myInit
 
     subroutine myTextChanged(index, text) bind(C)
