@@ -4,9 +4,17 @@
 
 ### Install Fortran
 
+#### Debian Trixie
+
+I installed Fortran by running
+
+`sudo apt install gfortran`
+
+I then downloaded FPM from https://github.com/fortran-lang/fpm/releases/download/current/fpm-linux-x86_64
+
 #### Raspberry PI 5
 
-So far I have been **unable to run the app** on my Raspberry Pi 5.
+So far I have been **unable to run the app** on my Raspberry Pi 5 due to having an 'old' version of gcc (12.2).
 
 `sudo apt install gfortran`
 
@@ -53,4 +61,9 @@ Run the app via fpm
 Windows 11
 
 ![image](https://github.com/user-attachments/assets/cd3aab3b-8201-4f50-b4c9-94165d44e5e7)
+
+Debian Trixie
+
+![Screenshot From 2025-01-14 19-09-22](https://github.com/user-attachments/assets/9b866568-9eec-415b-a5b3-ae62983a846c)
+
 
