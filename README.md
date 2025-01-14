@@ -4,6 +4,22 @@
 
 ### Install Fortran
 
+#### Raspberry PI 5
+
+So far I have been **unable to run the app** on my Raspberry Pi 5.
+
+`sudo apt install gfortran`
+
+##### Install FPM
+
+###### Through Conda
+
+Based on these instructions: https://fpm.fortran-lang.org/install/index.html
+
+Download and run https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
+
+
+
 #### Windows
 
 Grab the installer from https://www.msys2.org/#installation
